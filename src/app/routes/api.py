@@ -1,79 +1,47 @@
-import json
 import statistics
-from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
-from dataset import DATASET
-from frontend_service import Metrics, call_external_service
+from src.app.config import get_settings
+from src.app.models import BatchRequest, ScoreRequest, SentimentResponse, TextInput
+from src.app.services.sentiment_client import call_external_service
+from src.app.utils.metrics import Metrics
+from src.app.utils.normalization import calculate_sentiment, load_score_map
 
-DEFAULT_SERVICE_URL = "http://localhost:8000"
-HTML_FILE = Path(__file__).parent / "template" / "index.html"
+router = APIRouter()
 metrics = Metrics()
+_score_map: Dict[str, float] = {}
 
 
-class ScoreRequest(BaseModel):
-    """Request payload for scoring a single text.
+def get_or_load_score_map() -> Dict[str, float]:
+    """Retrieve or lazily initialize the LabMT score map."""
+    global _score_map
+    if not _score_map:
+        settings = get_settings()
+        _score_map = load_score_map(settings.wordlist_file)
+    return _score_map
 
-    Parameters
-    ----------
-    service_url : str
-        Base URL for the external sentiment service, e.g. "http://localhost:8000".
-        The app will call "{service_url}/v1/sentiment".
-    text : str
-        Input text to score.
 
-    Notes
-    -----
-    We route external calls via the backend to avoid CORS issues and keep JS simple.
+@router.post("/v1/sentiment", response_model=SentimentResponse)
+def sentiment_calculation(payload: TextInput) -> SentimentResponse:
+    """Calculate sentiment from the LabMT wordlist.
+
+    The returned score is the mean of the centered happiness scores for the
+    recognized words, clipped to `[-5, 5]`, together with its corresponding
+    sentiment label.
     """
-
-    service_url: str = Field(..., description="Base URL of external service, e.g. http://localhost:8000")
-    text: str = Field(..., min_length=1, description="Text to score")
-class BatchRequest(BaseModel):
-    """Request payload for batch evaluation on a dataset.
-
-    Parameters
-    ----------
-    service_url : str
-        Base URL for the external sentiment service.
-    dataset : list
-        List of [text, gold_label] pairs.
-
-    Examples
-    --------
-    >>> req = BatchRequest(service_url="http://localhost:8000", dataset=[["Good course", "positive"]])
-    >>> req.dataset[0][1]
-    'positive'
-    """
-
-    service_url: str
-    dataset: List[List[str]] = Field(..., description='List like [["text", "positive"], ...]')
+    score_map = get_or_load_score_map()
+    score, label = calculate_sentiment(payload.text, score_map)
+    return SentimentResponse(score=score, label=label)
 
 
-app = FastAPI(title="DTU Sentiment Demo Frontend", version="1.0.0")
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
-
-
-@app.get("/", response_class=HTMLResponse)
-def index() -> str:
-    dataset_js = json.dumps(DATASET, ensure_ascii=False)
-    template = HTML_FILE.read_text(encoding="utf-8")
-
-    return template.replace("__DATASET_JSON__", dataset_js).replace(
-        "__DEFAULT_SERVICE_URL__", DEFAULT_SERVICE_URL
-    )
-
-@app.post("/api/score")
+@router.post("/api/score")
 async def api_score(req: ScoreRequest) -> JSONResponse:
-    """Score a single text via the external service."""
+    """Score a single text via the external service with diagnostic info."""
     score, info, label = await call_external_service(str(req.service_url), req.text, metrics)
     if score is None:
-        # Pedagogic error messages come from call_external_service()
         return JSONResponse(status_code=502, content={"detail": info.get("error", "Unknown error.")})
 
     payload: Dict[str, Any] = {
@@ -86,16 +54,9 @@ async def api_score(req: ScoreRequest) -> JSONResponse:
     return JSONResponse(content=payload)
 
 
-@app.post("/api/batch")
+@router.post("/api/batch")
 async def api_batch(req: BatchRequest) -> JSONResponse:
-    """Run a batch evaluation on a [text, gold_label] dataset.
-
-    Notes
-    -----
-    This runs requests sequentially for clarity (teaching). The student-built
-    service should still be capable of handling concurrent clients; you can
-    trivially parallelize this later if desired.
-    """
+    """Run a batch evaluation on a [text, gold_label] dataset."""
     rows_out: List[Dict[str, Any]] = []
     latencies: List[float] = []
     correct = 0
@@ -122,7 +83,6 @@ async def api_batch(req: BatchRequest) -> JSONResponse:
         latencies.append(latency_ms)
 
         if score is None:
-            # Count as incorrect but keep going; useful for demos.
             rows_out.append(
                 {
                     "text": text,
@@ -172,7 +132,8 @@ async def api_batch(req: BatchRequest) -> JSONResponse:
     )
 
 
-@app.get("/api/metrics")
+@router.get("/api/metrics")
 def api_metrics() -> JSONResponse:
-    """Return a snapshot of in-memory metrics."""
+    """Return a snapshot of in-memory operational metrics."""
     return JSONResponse(content=metrics.snapshot())
+

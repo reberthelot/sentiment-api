@@ -13,7 +13,7 @@ docker compose up --build
 The API is then available at:
 
 - Swagger documentation: http://localhost:8000/docs
-- UI interface: http://localhost:8000/ui
+- UI interface: http://localhost:8000/
 - Sentiment endpoint: `POST http://localhost:8000/v1/sentiment`
 
 Stop the service with `Ctrl+C`.
@@ -40,4 +40,12 @@ The same documentation and API endpoint are available on port `8000`.
 curl -X POST http://localhost:8000/v1/sentiment \
   -H "Content-Type: application/json" \
   -d '{"text":"It was a great course."}'
+```
+
+## Running Tests
+
+Execute the automated test suite with `pytest`:
+
+```bash
+pytest
 ```

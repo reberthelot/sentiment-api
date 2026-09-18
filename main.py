@@ -1,8 +1,8 @@
-from backend import app as backend_app
-from frontend import app as ui_app
+"""Root application launcher for easy local and container execution."""
 
-# Point the root app to your backend API
-app = backend_app
+from src.app.main import app
 
-# Mount the UI sub-application onto the /ui route
-app.mount("/ui", ui_app)
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

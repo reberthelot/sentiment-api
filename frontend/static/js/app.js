@@ -12,7 +12,7 @@ function renderMetrics(metrics) {
 }
 
 async function refreshMetrics() {
-  const response = await fetch("api/metrics");
+  const response = await fetch("/api/metrics");
   renderMetrics(await response.json());
 }
 
@@ -50,7 +50,7 @@ get("scoreBtn").addEventListener("click", async () => {
   const text = get("textInput").value;
   if (!serviceUrl) return showError("singleError", "Could not score the text.", "Please provide the base URL of the external service.");
   if (!text.trim()) return showError("singleError", "Could not score the text.", "Please enter some text to score.");
-  const response = await fetch("api/score", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service_url: serviceUrl, text }) });
+  const response = await fetch("/api/score", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service_url: serviceUrl, text }) });
   const data = await response.json(); await refreshMetrics();
   if (!response.ok) return showError("singleError", "Could not score the text.", data.detail || "Unknown error.");
   get("singleResult").innerHTML = `<span class="pill">Score: <span class="mono">${data.score}</span></span><span class="pill">Label: <span class="mono">${data.label}</span></span><span class="pill">Latency: <span class="mono">${data.latency_ms.toFixed(1)} ms</span></span>${data.warning ? `<div class="small">${escapeHtml(data.warning)}</div>` : ""}`;
@@ -61,7 +61,7 @@ get("batchBtn").addEventListener("click", async () => {
   setVisible("batchError", false); setVisible("batchSummary", false); setVisible("batchTableWrap", false); get("batchTableWrap").innerHTML = "";
   const serviceUrl = get("serviceUrl").value.trim();
   if (!serviceUrl) return showError("batchError", "Batch run failed.", "Please provide the base URL of the external service.");
-  const response = await fetch("api/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service_url: serviceUrl, dataset: DATASET }) });
+  const response = await fetch("/api/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service_url: serviceUrl, dataset: DATASET }) });
   const data = await response.json(); await refreshMetrics();
   if (!response.ok) return showError("batchError", "Batch run failed.", data.detail || "Unknown error.");
   get("batchSummary").innerHTML = `<span class="pill">Items: <span class="mono">${data.n}</span></span><span class="pill">Accuracy: <span class="mono">${(100 * data.accuracy).toFixed(1)}%</span></span><span class="pill">Avg latency/item: <span class="mono">${data.avg_latency_ms.toFixed(1)} ms</span></span>`;

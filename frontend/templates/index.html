@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DTU Sentiment Demo</title>
-  <link rel="stylesheet" href="static/styles.css">
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   <header>
@@ -25,7 +25,6 @@
             <label for="sampleSelect">Predefined English sample (optional)</label>
             <select id="sampleSelect"></select>
           </div>
-          
         </div>
         <div>
           <label for="textInput">Course evaluation text</label>
@@ -43,7 +42,7 @@
         <h3>Operational metrics</h3>
         <div id="metricsBox" class="result"><div class="small">No requests yet.</div></div>
         <h3>Notes for students</h3>
-        <div class="small"><ul><li>This frontend calls <span class="mono">api/score</span>, which then calls your service.</li><li>Batch accuracy compares positive, neutral, and negative labels.</li></ul></div>
+        <div class="small"><ul><li>This frontend calls <span class="mono">/api/score</span>, which then calls your service.</li><li>Batch accuracy compares positive, neutral, and negative labels.</li></ul></div>
       </aside>
     </div>
     <section class="card batch-card">
@@ -54,6 +53,6 @@
     </section>
   </main>
   <script>window.DATASET = __DATASET_JSON__;</script>
-  <script src="static/app.js"></script>
+  <script src="/static/js/app.js"></script>
 </body>
 </html>
